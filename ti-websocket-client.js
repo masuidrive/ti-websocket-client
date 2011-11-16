@@ -855,7 +855,8 @@ WebSocket.prototype._create_frame = function(opcode, d, last_frame) {
 			source: length,
 			dest: out,
 			position: outIndex++,
-			type: Ti.Codec.TYPE_SHORT
+			type: Ti.Codec.TYPE_SHORT,
+			byteOrder: Ti.Codec.BIG_ENDIAN
 		});
 		outIndex += 2;
 	}
@@ -870,7 +871,8 @@ WebSocket.prototype._create_frame = function(opcode, d, last_frame) {
 			source: length,
 			dest: out,
 			position: outIndex,
-			type: Ti.Codec.TYPE_LONG
+			type: Ti.Codec.TYPE_LONG,
+			byteOrder: Ti.Codec.BIG_ENDIAN
 		});
 		outIndex += 8;
 	}
@@ -929,7 +931,7 @@ WebSocket.prototype._mask_payload = function(out, outIndex, payload) {
 	}
 };
 
-var parse_frame = function(buffer, size) {
+var parse_frame = function(buffer, size, socket) {
 	if(size < 3) return undefined;
 	
 	var byte1 = Utils.read_byte(buffer, 0);
@@ -943,20 +945,16 @@ var parse_frame = function(buffer, size) {
 	var offset = 2;
 	switch(len) {
 	case 126:
-		var bytesRead = socket.read(buffer, 0, 2);
 		len = Utils.read_2byte(buffer, offset);
 		offset += 2;
 		break;
 		
 	case 127:
-		// too large
-		var bytesRead = socket.read(buffer, 0, 8);
+		// too large I felt
 		len = Utils.read_8byte(buffer, offset);
 		offset += 8;
 		break;
 	}
-
-	if(size < len + offset) return undefined;
 
 	var string = Ti.Codec.decodeString({
 		source: buffer,
@@ -1013,7 +1011,7 @@ WebSocket.prototype._readCallback = function(e) {
 		return;
 	}
 
-	var frame = parse_frame(e.buffer, e.bytesProcessed);
+	var frame = parse_frame(e.buffer, e.bytesProcessed, this.socket);
 	e.buffer.clear();
 	// TODO: check frame
 	
@@ -1087,6 +1085,7 @@ WebSocket.prototype.close = function(code, message) {
 			dest: buffer,
 			position: 0,
 			type: Ti.Codec.TYPE_SHORT,
+			byteOrder: Ti.Codec.BIG_ENDIAN
 		});
 		
 		if(message) {
