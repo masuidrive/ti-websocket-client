@@ -393,7 +393,8 @@ exports.read_byte = function(buffer, position) {
 	var data = Ti.Codec.decodeNumber({
 		source: buffer,
 		position: position || 0,
-		type: Ti.Codec.TYPE_BYTE
+		type: Ti.Codec.TYPE_BYTE,
+		byteOrder: Ti.Codec.BIG_ENDIAN
 	});
 	if(data < 0) { data += 256; } //2**8;
 	return data;
@@ -403,7 +404,8 @@ exports.read_2byte = function(buffer, position) {
 	var data = Ti.Codec.decodeNumber({
 		source: buffer,
 		position: position || 0,
-		type: Ti.Codec.TYPE_SHORT
+		type: Ti.Codec.TYPE_SHORT,
+		byteOrder: Ti.Codec.BIG_ENDIAN
 	});
 	if(data < 0) { data += 65536; } // 2**16
 	return data;
@@ -413,7 +415,9 @@ exports.read_8byte = function(buffer, position) {
 	var data = Ti.Codec.decodeNumber({
 		source: buffer,
 		position: position || 0,
-		type: Ti.Codec.TYPE_LONG
+		type: Ti.Codec.TYPE_LONG,
+		byteOrder: Ti.Codec.BIG_ENDIAN
+
 	});
 	if(data < 0) { data += 18446744073709551616; } // 2**64
 	return data;
@@ -749,12 +753,19 @@ WebSocket.prototype._read_http_headers = function() {
 	while(true) {
 		var bytesRead = this._socket.read(buffer);
 		if(bytesRead > 0) {
+			var lastStringLen = string.length;
 			string += Ti.Codec.decodeString({
 				source: buffer,
 				charset: Ti.Codec.CHARSET_ASCII
 			});
-			buffer.clear(); // clear the buffer before the next read
-			if(string.match(/\r\n\r\n/)) {
+			var eoh = string.match(/\r\n\r\n/);
+			if(eoh) {
+				var offset = (eoh.index + 4) - lastStringLen;
+				string = string.substring(0, offset-2);
+
+				this.buffer = Ti.createBuffer({ length: BUFFER_SIZE });
+				this.bufferSize = bytesRead - offset;
+				this.buffer.copy(buffer, 0, offset, this.bufferSize);
 				break;
 			}
 		}
@@ -765,8 +776,9 @@ WebSocket.prototype._read_http_headers = function() {
 				return false; // Timeout
 			}
 		}
+		buffer.clear(); // clear the buffer before the next read
 	}
-	buffer.release();
+	buffer.clear();
 	this.headers = string.split("\r\n");
 	
 	return true;
@@ -946,7 +958,7 @@ WebSocket.prototype._mask_payload = function(out, outIndex, payload) {
 	}
 };
 
-var parse_frame = function(buffer, size, socket) {
+var parse_frame = function(buffer, size) {
 	if(size < 3) {
 		return undefined;
 	}
@@ -971,6 +983,10 @@ var parse_frame = function(buffer, size, socket) {
 		len = Utils.read_8byte(buffer, offset);
 		offset += 8;
 		break;
+	}
+
+	if(len + offset > size) {
+		return undefined;
 	}
 
 	var string = Ti.Codec.decodeString({
@@ -1028,6 +1044,13 @@ WebSocket.prototype._socket_close = function() {
 WebSocket.prototype._read_callback = function(e) {
 	var self = this;
 
+	if("undefined" === typeof e) {
+		e = {
+			bytesProcessed: 0,
+			buffer: Ti.createBuffer({ length: BUFFER_SIZE })
+		};
+	}
+	
 	if (e.bytesProcessed === -1) { // EOF
 		this._socket_close();
 		return undefined;
@@ -1038,61 +1061,66 @@ WebSocket.prototype._read_callback = function(e) {
 		this.bufferSize = e.bytesProcessed;
 	}
 	else {
-		this.buffer.append(e.buffer, 0, e.bytesProcessed);
+		this.buffer.copy(e.buffer, this.bufferSize, 0, e.bytesProcessed);
 		this.bufferSize += e.bytesProcessed;
 		e.buffer.clear();
 	}
 
-	var frame = parse_frame(this.buffer, this.bufferSize, this._socket);
-	if(frame.size < this.bufferSizes) {
-		var nextBuffer = Ti.createBuffer({ length: BUFFER_SIZE });
-		nextBuffer.append(this.buffer, 0, frame.size);
-		this.buffer.clear();
-		this.buffer = nextBuffer;
-		this.bufferSize -= frame.size;
+	var frame = parse_frame(this.buffer, this.bufferSize);
+	if('undefined' === typeof frame) {
+		Ti.Stream.read(this._socket, e.buffer, function(e) { self._read_callback(e); });
 	}
 	else {
-		this.buffer.clear();
-		this.bufferSize = 0;
-	}
-	
-	switch(frame.opcode) {
-	case 0x00: // continuation frame
-	case 0x01: // text frame
-	case 0x02: // binary frame
-		if(frame.fin) {
-			this.emit("message", {data: this._readBuffer + frame.payload});
-			this.onmessage({data: this._readBuffer + frame.payload});
-			this._readBuffer = '';
+		if(frame.size < this.bufferSizes) {
+			var nextBuffer = Ti.createBuffer({ length: BUFFER_SIZE });
+			nextBuffer.copy(this.buffer, 0, frame.size, this.bufferSize - frame.size);
+			this.buffer.clear();
+			this.buffer = nextBuffer;
+			this.bufferSize -= frame.size;
 		}
 		else {
-			this._readBuffer += frame.payload;
+			this.buffer.clear();
+			this.bufferSize = 0;
 		}
-		break;
 		
-	case 0x08: // connection close
-		if(this.readyState === CLOSING) {
-			this._socket_close();
-		}
-		else {
-			this.readyState = CLOSING;
-			this._socket.write(this._create_frame(0x08));
-			this._closingTimer = setTimeout(function() {
-				self._socket_close();
-			}, CLOSING_TIMEOUT);
-		}
-		break;
+		switch(frame.opcode) {
+		case 0x00: // continuation frame
+		case 0x01: // text frame
+		case 0x02: // binary frame
+			if(frame.fin) {
+				this.emit("message", {data: this._readBuffer + frame.payload});
+				this.onmessage({data: this._readBuffer + frame.payload});
+				this._readBuffer = '';
+			}
+			else {
+				this._readBuffer += frame.payload;
+			}
+			break;
+			
+		case 0x08: // connection close
+			if(this.readyState === CLOSING) {
+				this._socket_close();
+			}
+			else {
+				this.readyState = CLOSING;
+				this._socket.write(this._create_frame(0x08));
+				this._closingTimer = setTimeout(function() {
+					self._socket_close();
+				}, CLOSING_TIMEOUT);
+			}
+			break;
+			
+		case 0x09: // ping
+			this._socket.write(this._create_frame(0x0a, frame.payload));
+			break;
 		
-	case 0x09: // ping
-		this._socket.write(this._create_frame(0x0a, frame.payload));
-		break;
-	
-	case 0x0a: // pong
-		this._pong_received = true;
-		break;
+		case 0x0a: // pong
+			this._pong_received = true;
+			break;
+		}
+		
+		this._read_callback();
 	}
-	
-	Ti.Stream.read(this._socket, e.buffer, function(e) { self._read_callback(e); });
 };
 
 WebSocket.prototype._error = function(e) {
@@ -1158,7 +1186,7 @@ WebSocket.prototype._connect = function() {
 	}
 
 	var self = this;
-	this._socket = Ti.Network.socket.createTCP({
+	this._socket = Ti.Network.Socket.createTCP({
 		host: this._host,
 		port: this._port,
 		mode: Ti.Network.READ_WRITE_MODE,
@@ -1183,7 +1211,7 @@ WebSocket.prototype._connect = function() {
 			self.emit("open");
 			self.onopen();
 			
-			Ti.Stream.read(self._socket, Ti.createBuffer({length: BUFFER_SIZE}), function(e){ self._read_callback(e); });
+			self._read_callback();
 		},
 		closed: function() {
 			self._socket_close();
@@ -1192,6 +1220,6 @@ WebSocket.prototype._connect = function() {
 			self._error(e);
 		}
 	});
-	socket.connect();
+	this._socket.connect();
 };
 
