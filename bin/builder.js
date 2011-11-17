@@ -15,7 +15,7 @@ var extract_require = function(filename) {
 	var content = fs.readFileSync(LIB_DIR + filename + '.js', 'utf8');
 	return content.replace(/require\s*\(\s*['"]{1}(.*?)['"]{1}\s*\)/g, function(full, fname) {
 		var exports = extract_require(fname);
-		return "(function(){var exports={};" + exports + ";return exports;})()"
+		return "(function(){var exports={};" + exports + "return exports;}())"
 	});
 };
 
