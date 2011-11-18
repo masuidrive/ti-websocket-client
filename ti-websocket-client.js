@@ -64,22 +64,24 @@ var SHA1 = (function(){
   /**
    * Spec is the BDD style test utilities.
    */
-  var Spec = {
+  var Spec;
+  Spec = {
     /** Replace the Spec.describe function with empty function if false. */
     enabled: true,
     
     /** Indicates whether object 'a' is "equal to" 'b'. */
     equals: function(a, b) {
+      var i;
       if (a instanceof Array && b instanceof Array) {
-        if (a.length != b.length) return false;
-        for (var i = 0; i < a.length; i++) if (!Spec.equals(a[i], b[i])) return false;
+        if (a.length !== b.length) { return false; }
+        for (i = 0; i < a.length; i++) { if (!Spec.equals(a[i], b[i])) { return false; } }
         return true;
       }
-      if ((a != null && b != null) && (typeof a == "object" && typeof b == "object")) {
-        for (var i in a) if (!Spec.equals(a[i], b[i])) return false;
+      if ((a !== null && b !== null) && (typeof a === "object" && typeof b === "object")) {
+        for (i in a) { if(a.hasOwnProperty(i)) { if (!Spec.equals(a[i], b[i])) { return false; } } }
         return true;
       }
-      return (a == b);
+      return (a === b);
     },
     
     /** equivalent to xUint's assert */
@@ -101,11 +103,14 @@ var SHA1 = (function(){
     /** Write your specification by using describe method. */
     describe: function(title, spec) {
       Spec.currentTitle = title;
-      for (var name in spec) {
-        Spec.currentMessage = name;
-        Spec.currentIndicator = 0;
-        spec[name]();
-        Spec.currentIndicator = null;
+      var name;
+      for (name in spec) {
+        if (spec.hasOwnProperty(name)) {
+          Spec.currentMessage = name;
+          Spec.currentIndicator = 0;
+          spec[name]();
+          Spec.currentIndicator = null;
+        }
       }
       Spec.currentMessage = Spec.currentTitle = null;
     },
@@ -116,7 +121,7 @@ var SHA1 = (function(){
   Spec.should.equal = function(a, b, message) { return Spec.should(Spec.equals(a, b), message); };
   Spec.should.not = function(a, message) { return Spec.should(!a, message); };
   Spec.should.not.equal = function(a, b, message) { return Spec.should(!Spec.equals(a, b), message); };
-  if (!Spec.enabled) Spec.describe = function(){};
+  if (!Spec.enabled) { Spec.describe = function(){}; }
   
   
   // self test
@@ -152,9 +157,9 @@ var SHA1 = (function(){
   // int32 -> hexdigits string (e.g. 0x123 -> '00000123')
   function strfhex32(i32) {
     i32 &= 0xffffffff;
-    if (i32 < 0) i32 += 0x100000000;
+    if (i32 < 0) { i32 += 0x100000000; }
     var hex = Number(i32).toString(16);
-    if (hex.length < 8) hex = "00000000".substr(0, 8 - hex.length) + hex;
+    if (hex.length < 8) { hex = "00000000".substr(0, 8 - hex.length) + hex; }
     return hex;
   }
   Spec.describe("sha1", {
@@ -167,7 +172,7 @@ var SHA1 = (function(){
 /*
   // int32 -> string (e.g. 123 -> '00000000 00000000 00000000 01111011')
   function strfbits(i32) {
-    if (typeof arguments.callee.ZERO32 == 'undefined') {
+    if (typeof arguments.callee.ZERO32 === 'undefined') {
       arguments.callee.ZERO32 = new Array(33).join("0");
     }
     
@@ -180,9 +185,9 @@ var SHA1 = (function(){
   }
   Spec.describe("sha1", {
     "strfbits": function() {
-		Ti.API.info(strfbits(0));
-		Ti.API.info(strfbits(1));
-		Ti.API.info(strfbits(123));
+    Ti.API.info(strfbits(0));
+    Ti.API.info(strfbits(1));
+    Ti.API.info(strfbits(123));
       Spec.should.equal(strfbits(0),   "00000000 00000000 00000000 00000000");
       Spec.should.equal(strfbits(1),   "00000000 00000000 00000000 00000001");
       Spec.should.equal(strfbits(123), "00000000 00000000 00000000 01111011");
@@ -195,7 +200,7 @@ var SHA1 = (function(){
   // -----------------------------------------------------------
   // Returns Number(32bit unsigned integer) array size to fit for blocks (512-bit strings)
   function padding_size(nbits) {
-    var n = nbits + 1 + 64
+    var n = nbits + 1 + 64;
     return 512 * Math.ceil(n / 512) / 32;
   }
   Spec.describe("sha1", {
@@ -212,13 +217,14 @@ var SHA1 = (function(){
     var nchar = m.length;
     var size = padding_size(nchar * 8);
     var words = new Array(size);
-    for (var i = 0, j = 0; i < nchar; ) {
+    var i;
+    for (i = 0, j = 0; i < nchar; ) {
       words[j++] = ((m.charCodeAt(i++) & 0xff) << 24) | 
                    ((m.charCodeAt(i++) & 0xff) << 16) | 
                    ((m.charCodeAt(i++) & 0xff) << 8)  | 
-                   ((m.charCodeAt(i++) & 0xff))
+                   ((m.charCodeAt(i++) & 0xff));
     }
-    while (j < size) words[j++] = 0;
+    while (j < size) { words[j++] = 0; }
     return words;
   }
   Spec.describe("sha1", {
@@ -231,7 +237,7 @@ var SHA1 = (function(){
   function write_nbits(words, length, nbits) {
     if (nbits > 0xffffffff) {
       var lo = nbits & 0xffffffff;
-      if (lo < 0) lo += 0x100000000;
+      if (lo < 0) { lo += 0x100000000; }
       words[length - 1] = lo;
       words[length - 2] = (nbits - lo) / 0x100000000;
     } else {
@@ -267,7 +273,7 @@ var SHA1 = (function(){
       var W = new Array(80);
       
       // (a)
-      for (t = 0;  t < 16; t++) W[t] = words[i++];
+      for (t = 0;  t < 16; t++) { W[t] = words[i++]; }
       
       // (b)
       for (t = 16; t < 80; t++) {
@@ -283,10 +289,10 @@ var SHA1 = (function(){
       for (t = 0; t < 80; t++) {
         var tmp = ((A << 5) | (A >>> 27)) + E + W[t];
         
-        if      (t >=  0 && t <= 19) tmp += ((B & C) | ((~B) & D))        + 0x5a827999;
-        else if (t >= 20 && t <= 39) tmp += (B ^ C ^ D)                   + 0x6ed9eba1;
-        else if (t >= 40 && t <= 59) tmp += ((B & C) | (B & D) | (C & D)) + 0x8f1bbcdc;
-        else if (t >= 60 && t <= 79) tmp += (B ^ C ^ D)                   + 0xca62c1d6;
+        if      (t >=  0 && t <= 19) { tmp += ((B & C) | ((~B) & D))        + 0x5a827999; }
+        else if (t >= 20 && t <= 39) { tmp += (B ^ C ^ D)                   + 0x6ed9eba1; }
+        else if (t >= 40 && t <= 59) { tmp += ((B & C) | (B & D) | (C & D)) + 0x8f1bbcdc; }
+        else if (t >= 60 && t <= 79) { tmp += (B ^ C ^ D)                   + 0xca62c1d6; }
         
         E = D; D = C; C = ((B << 30) | (B >>> 2)); B = A; A = tmp;
       }
@@ -297,11 +303,11 @@ var SHA1 = (function(){
       H[2] = (H[2] + C) & 0xffffffff;
       H[3] = (H[3] + D) & 0xffffffff;
       H[4] = (H[4] + E) & 0xffffffff;
-      if (H[0] < 0) H[0] += 0x100000000;
-      if (H[1] < 0) H[1] += 0x100000000;
-      if (H[2] < 0) H[2] += 0x100000000;
-      if (H[3] < 0) H[3] += 0x100000000;
-      if (H[4] < 0) H[4] += 0x100000000;
+      if (H[0] < 0) { H[0] += 0x100000000; }
+      if (H[1] < 0) { H[1] += 0x100000000; }
+      if (H[2] < 0) { H[2] += 0x100000000; }
+      if (H[3] < 0) { H[3] += 0x100000000; }
+      if (H[4] < 0) { H[4] += 0x100000000; }
     }
     
     return H;
@@ -310,13 +316,13 @@ var SHA1 = (function(){
   // message: 8bit string
   var SHA1 = function(message) {
     this.message = message;
-  }
+  };
 
   function strfhex8(i8) {
     i8 &= 0xff;
-    if (i8 < 0) i8 += 0x100;
+    if (i8 < 0) { i8 += 0x100; }
     var hex = Number(i8).toString(16);
-    if (hex.length < 2) hex = "00".substr(0, 2 - hex.length) + hex;
+    if (hex.length < 2) { hex = "00".substr(0, 2 - hex.length) + hex; }
     return hex;
   }
 
@@ -331,37 +337,38 @@ var SHA1 = (function(){
 
     base64digest: function() {
       var hex = this.hexdigest();
-		var output = "";
-		var chr1, chr2, chr3, enc1, enc2, enc3, enc4;
-		var i = 0;
-		while (i < hex.length) {
-			chr1 = parseInt(hex.substring(i+0, i+2), 16);
-			chr2 = parseInt(hex.substring(i+2, i+4), 16);
-			chr3 = parseInt(hex.substring(i+4, i+6), 16);
- 
-			enc1 = chr1 >> 2;
-			enc2 = ((chr1 & 3) << 4) | (chr2 >> 4);
-			enc3 = ((chr2 & 15) << 2) | (chr3 >> 6);
-			enc4 = chr3 & 63;
- 
-			if (isNaN(chr2)) {
-				enc3 = enc4 = 64;
-			} else if (isNaN(chr3)) {
-				enc4 = 64;
-			}
- 
-			output = output +
-			_base64_keyStr.charAt(enc1) + _base64_keyStr.charAt(enc2) +
-			_base64_keyStr.charAt(enc3) + _base64_keyStr.charAt(enc4);
- 			i += 6;
-		}
+      var output = "";
+      var chr1, chr2, chr3, enc1, enc2, enc3, enc4;
+      var i = 0;
+      while (i < hex.length) {
+        chr1 = parseInt(hex.substring(i,   i+2), 16);
+        chr2 = parseInt(hex.substring(i+2, i+4), 16);
+        chr3 = parseInt(hex.substring(i+4, i+6), 16);
+   
+        enc1 = chr1 >> 2;
+        enc2 = ((chr1 & 3) << 4) | (chr2 >> 4);
+        enc3 = ((chr2 & 15) << 2) | (chr3 >> 6);
+        enc4 = chr3 & 63;
+   
+        if (isNaN(chr2)) {
+          enc3 = enc4 = 64;
+        } else if (isNaN(chr3)) {
+          enc4 = 64;
+        }
+   
+        output = output +
+        _base64_keyStr.charAt(enc1) + _base64_keyStr.charAt(enc2) +
+        _base64_keyStr.charAt(enc3) + _base64_keyStr.charAt(enc4);
+        i += 6;
+      }
 
       return output;
     },
     
     hexdigest: function() {
       var digest = this.digest();
-      for (var i = 0; i < digest.length; i++) digest[i] = strfhex32(digest[i]);
+      var i;
+      for (i = 0; i < digest.length; i++) { digest[i] = strfhex32(digest[i]); }
       return digest.join("");
     }
   };
@@ -377,18 +384,19 @@ var SHA1 = (function(){
   });
   
   return SHA1;
-})();
+}());
 
 exports.SHA1 = SHA1; // add for node.js
-;return exports;})().SHA1;
+return exports;}()).SHA1;
 var Utils = (function(){var exports={};
 exports.read_byte = function(buffer, position) {
 	var data = Ti.Codec.decodeNumber({
 		source: buffer,
 		position: position || 0,
-		type: Ti.Codec.TYPE_BYTE
+		type: Ti.Codec.TYPE_BYTE,
+		byteOrder: Ti.Codec.BIG_ENDIAN
 	});
-	if(data < 0) data += 256;//2**8;
+	if(data < 0) { data += 256; } //2**8;
 	return data;
 };
 
@@ -396,9 +404,10 @@ exports.read_2byte = function(buffer, position) {
 	var data = Ti.Codec.decodeNumber({
 		source: buffer,
 		position: position || 0,
-		type: Ti.Codec.TYPE_SHORT
+		type: Ti.Codec.TYPE_SHORT,
+		byteOrder: Ti.Codec.BIG_ENDIAN
 	});
-	if(data < 0) data += 65536; // 2**16
+	if(data < 0) { data += 65536; } // 2**16
 	return data;
 };
 
@@ -406,9 +415,11 @@ exports.read_8byte = function(buffer, position) {
 	var data = Ti.Codec.decodeNumber({
 		source: buffer,
 		position: position || 0,
-		type: Ti.Codec.TYPE_LONG
+		type: Ti.Codec.TYPE_LONG,
+		byteOrder: Ti.Codec.BIG_ENDIAN
+
 	});
-	if(data < 0) data += 18446744073709551616; // 2**64
+	if(data < 0) { data += 18446744073709551616; } // 2**64
 	return data;
 };
 
@@ -424,7 +435,7 @@ exports.byte_length = function(str) {
 exports.trim = function(str) {
 	return String(str).replace(/^\s+|\s+$/g, "");
 };
-;return exports;})();
+return exports;}());
 var events = (function(){var exports={};// Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -459,7 +470,7 @@ exports.EventEmitter = EventEmitter;
 // that to be increased. Set to zero for unlimited.
 var defaultMaxListeners = 10;
 EventEmitter.prototype.setMaxListeners = function(n) {
-  if (!this._events) this._events = {};
+  if (!this._events) { this._events = {}; }
   this._maxListeners = n;
 };
 
@@ -467,11 +478,12 @@ EventEmitter.prototype.setMaxListeners = function(n) {
 EventEmitter.prototype.emit = function() {
   var type = arguments[0];
 
-  if (!this._events) return false;
+  if (!this._events) { return false; }
   var handler = this._events[type];
-  if (!handler) return false;
+  if (!handler) { return false; }
 
-  if (typeof handler == 'function') {
+  var args, l, i;
+  if (typeof handler === 'function') {
     switch (arguments.length) {
       // fast cases
       case 1:
@@ -485,20 +497,20 @@ EventEmitter.prototype.emit = function() {
         break;
       // slower
       default:
-        var l = arguments.length;
-        var args = new Array(l - 1);
-        for (var i = 1; i < l; i++) args[i - 1] = arguments[i];
+        l = arguments.length;
+        args = new Array(l - 1);
+        for (i = 1; i < l; i++) { args[i - 1] = arguments[i]; }
         handler.apply(this, args);
     }
     return true;
 
   } else if (isArray(handler)) {
-    var l = arguments.length;
-    var args = new Array(l - 1);
-    for (var i = 1; i < l; i++) args[i - 1] = arguments[i];
+    l = arguments.length;
+    args = new Array(l - 1);
+    for (i = 1; i < l; i++) { args[i - 1] = arguments[i]; }
 
     var listeners = handler.slice();
-    for (var i = 0, l = listeners.length; i < l; i++) {
+    for (i = 0, l = listeners.length; i < l; i++) {
       listeners[i].apply(this, args);
     }
     return true;
@@ -515,9 +527,9 @@ EventEmitter.prototype.addListener = function(type, listener) {
     throw new Error('addListener only takes instances of Function');
   }
 
-  if (!this._events) this._events = {};
+  if (!this._events) { this._events = {}; }
 
-  // To avoid recursion in the case that type == "newListeners"! Before
+  // To avoid recursion in the case that type === "newListeners"! Before
   // adding it to the listeners, first emit "newListeners".
   this.emit('newListener', type, listener);
 
@@ -566,7 +578,7 @@ EventEmitter.prototype.once = function(type, listener) {
   function g() {
     self.removeListener(type, g);
     listener.apply(this, arguments);
-  };
+  }
 
   g.listener = listener;
   self.on(type, g);
@@ -580,13 +592,13 @@ EventEmitter.prototype.removeListener = function(type, listener) {
   }
 
   // does not use listeners(), so no side effect of creating _events[type]
-  if (!this._events || !this._events[type]) return this;
+  if (!this._events || !this._events[type]) { return this; }
 
   var list = this._events[type];
 
   if (isArray(list)) {
-    var position = -1;
-    for (var i = 0, length = list.length; i < length; i++) {
+    var i, position = -1;
+    for (i = 0, length = list.length; i < length; i++) {
       if (list[i] === listener ||
           (list[i].listener && list[i].listener === listener))
       {
@@ -595,10 +607,11 @@ EventEmitter.prototype.removeListener = function(type, listener) {
       }
     }
 
-    if (position < 0) return this;
+    if (position < 0) { return this; }
     list.splice(position, 1);
-    if (list.length == 0)
+    if (list.length === 0) {
       delete this._events[type];
+    }
   } else if (list === listener ||
              (list.listener && list.listener === listener))
   {
@@ -615,19 +628,19 @@ EventEmitter.prototype.removeAllListeners = function(type) {
   }
 
   // does not use listeners(), so no side effect of creating _events[type]
-  if (type && this._events && this._events[type]) this._events[type] = null;
+  if (type && this._events && this._events[type]) { this._events[type] = null; }
   return this;
 };
 
 EventEmitter.prototype.listeners = function(type) {
-  if (!this._events) this._events = {};
-  if (!this._events[type]) this._events[type] = [];
+  if (!this._events) { this._events = {}; }
+  if (!this._events[type]) { this._events[type] = []; }
   if (!isArray(this._events[type])) {
     this._events[type] = [this._events[type]];
   }
   return this._events[type];
 };
-;return exports;})();
+return exports;}());
 
 var debug = function(str) {
 	Ti.API.debug(str);
@@ -660,7 +673,7 @@ var WebSocket = function(url, protocols, origin, extensions) {
 	this._closingTimer = undefined;
 	this._handshake = undefined;
 	
-	this.socket = undefined;
+	this._socket = undefined;
 	
 	this._connect();
 };
@@ -685,7 +698,7 @@ WebSocket.prototype.onclose = function() {
 
 WebSocket.prototype._parse_url = function() {
 	var parsed = this.url.match(/^([a-z]+):\/\/([\w.]+)(:(\d+)|)(.*)/i);
-	if(!parsed || parsed[1] != 'ws') {
+	if(!parsed || parsed[1] !== 'ws') {
 		return false;
 	}
 	this._host = parsed[2];
@@ -716,12 +729,12 @@ var make_handshake = function(host, path, origin, protocols, extensions, handsha
 	}
 	
 	if(extensions && extensions.length > 0) {
-	  str += "Sec-WebSocket-Extensions: " + extensions.join(',') + "\r\n";
+		str += "Sec-WebSocket-Extensions: " + extensions.join(',') + "\r\n";
 	}
 	
 	// TODO: compression
 	//if @compression
-	//  extensions << "deflate-application-data"
+	//	extensions << "deflate-application-data"
 	//end	
 	
 	return str + "\r\n";
@@ -730,7 +743,7 @@ var make_handshake = function(host, path, origin, protocols, extensions, handsha
 WebSocket.prototype._send_handshake = function() {
 	this._handshake = make_handshake_key();
 	var handshake = make_handshake(this._host, this._path, this.origin, this.protocols, this.extensions, this._handshake);
-	return this.socket.write(Ti.createBuffer({ value: handshake })) > 0;
+	return this._socket.write(Ti.createBuffer({ value: handshake })) > 0;
 };
 
 WebSocket.prototype._read_http_headers = function() {
@@ -738,24 +751,34 @@ WebSocket.prototype._read_http_headers = function() {
 	var buffer = Ti.createBuffer({ length: BUFFER_SIZE });
 	var counter = 10;
 	while(true) {
-		var bytesRead = this.socket.read(buffer);
+		var bytesRead = this._socket.read(buffer);
 		if(bytesRead > 0) {
+			var lastStringLen = string.length;
 			string += Ti.Codec.decodeString({
 				source: buffer,
 				charset: Ti.Codec.CHARSET_ASCII
 			});
-			buffer.clear(); // clear the buffer before the next read
-			if(string.match(/\r\n\r\n/)) {
+			var eoh = string.match(/\r\n\r\n/);
+			if(eoh) {
+				var offset = (eoh.index + 4) - lastStringLen;
+				string = string.substring(0, offset-2);
+
+				this.buffer = Ti.createBuffer({ length: BUFFER_SIZE });
+				this.bufferSize = bytesRead - offset;
+				this.buffer.copy(buffer, 0, offset, this.bufferSize);
 				break;
 			}
 		}
 		else {
-			debug("read_http_headers: timeout")
+			debug("read_http_headers: timeout");
 			--counter;
-			if(counter < 0) return false; // Timeout
+			if(counter < 0) {
+				return false; // Timeout
+			}
 		}
+		buffer.clear(); // clear the buffer before the next read
 	}
-	buffer.release();
+	buffer.clear();
 	this.headers = string.split("\r\n");
 	
 	return true;
@@ -786,31 +809,33 @@ WebSocket.prototype._check_handshake_response = function() {
 		return false;
 	}
 	var h = extract_headers(this.headers);
-	if(!h['Upgrade'] || !h['Connection'] || !h['Sec-WebSocket-Accept']) {
+	if(!h.Upgrade || !h.Connection || !h['Sec-WebSocket-Accept']) {
 		return false;
 	}
-	if(h['Upgrade'].toLowerCase() != 'websocket' || h['Connection'].toLowerCase() != 'upgrade' || h['Sec-WebSocket-Accept'] != handshake_reponse(this._handshake)) {
+	if(h.Upgrade.toLowerCase() !== 'websocket' || h.Connection.toLowerCase() !== 'upgrade' || h['Sec-WebSocket-Accept'] !== handshake_reponse(this._handshake)) {
 		return false;
 	}
 	
 	// TODO: compression
-	// if h.has_key?('Sec-WebSocket-Extensions') and h['Sec-WebSocket-Extensions'] == 'deflate-application-data'
-	//   if @compression
+	// if h.has_key?('Sec-WebSocket-Extensions') and h['Sec-WebSocket-Extensions'] === 'deflate-application-data'
+	//	 if @compression
 	//	 @zout = Zlib::Deflate.new(Zlib::BEST_SPEED, Zlib::MAX_WBITS, 8, 1)
 	//	 @zin = Zlib::Inflate.new
-	//  end	  
+	//	end		
 	// else
-	//   @compression = false
+	//	 @compression = false
 	// end	
 	
 	this.readyState = OPEN;
 	return true;
-}
+};
 
 WebSocket.prototype._create_frame = function(opcode, d, last_frame) {
-	if(typeof last_frame == 'undefined') last_frame = true;
+	if(typeof last_frame === 'undefined') {
+		last_frame = true;
+	}
 	
-	if(last_frame == false && opcode >= 0x8 && opcode <= 0xf) {
+	if(last_frame === false && opcode >= 0x8 && opcode <= 0xf) {
 		return false;
 	}
 	
@@ -821,8 +846,10 @@ WebSocket.prototype._create_frame = function(opcode, d, last_frame) {
 	var data = d || ''; //compress(d)	// TODO
 	
 	var byte1 = opcode;
-	if(last_frame) byte1 = byte1 | 0x80;
-	
+	if(last_frame) { 
+		byte1 = byte1 | 0x80;
+	}
+
 	Ti.Codec.encodeNumber({
 		source: byte1,
 		dest: out,
@@ -855,11 +882,12 @@ WebSocket.prototype._create_frame = function(opcode, d, last_frame) {
 			source: length,
 			dest: out,
 			position: outIndex++,
-			type: Ti.Codec.TYPE_SHORT
+			type: Ti.Codec.TYPE_SHORT,
+			byteOrder: Ti.Codec.BIG_ENDIAN
 		});
 		outIndex += 2;
 	}
-	else { //  # write 8 byte length
+	else { //	# write 8 byte length
 		Ti.Codec.encodeNumber({
 			source: (127 | 0x80),
 			dest: out,
@@ -870,11 +898,12 @@ WebSocket.prototype._create_frame = function(opcode, d, last_frame) {
 			source: length,
 			dest: out,
 			position: outIndex,
-			type: Ti.Codec.TYPE_LONG
+			type: Ti.Codec.TYPE_LONG,
+			byteOrder: Ti.Codec.BIG_ENDIAN
 		});
 		outIndex += 8;
 	}
-  
+	
 	//# mask data
 	outIndex = this._mask_payload(out, outIndex, data);
 	out.length = outIndex;
@@ -920,17 +949,19 @@ WebSocket.prototype._mask_payload = function(out, outIndex, payload) {
 		return outIndex;
 	}
 	else {
-		var length = Ti.Codec.encodeString({
+		var len = Ti.Codec.encodeString({
 			source: payload,
 			dest: out,
 			destPosition: outIndex
 		});
-		return length + outIndex;
+		return len + outIndex;
 	}
 };
 
 var parse_frame = function(buffer, size) {
-	if(size < 3) return undefined;
+	if(size < 3) {
+		return undefined;
+	}
 	
 	var byte1 = Utils.read_byte(buffer, 0);
 	var fin = !!(byte1 & 0x80);
@@ -943,20 +974,20 @@ var parse_frame = function(buffer, size) {
 	var offset = 2;
 	switch(len) {
 	case 126:
-		var bytesRead = socket.read(buffer, 0, 2);
 		len = Utils.read_2byte(buffer, offset);
 		offset += 2;
 		break;
 		
 	case 127:
-		// too large
-		var bytesRead = socket.read(buffer, 0, 8);
+		// too large I felt
 		len = Utils.read_8byte(buffer, offset);
 		offset += 8;
 		break;
 	}
 
-	if(size < len + offset) return undefined;
+	if(len + offset > size) {
+		return undefined;
+	}
 
 	var string = Ti.Codec.decodeString({
 		source: buffer,
@@ -969,9 +1000,9 @@ var parse_frame = function(buffer, size) {
 };
 
 WebSocket.prototype.send = function(data) {
-	if(data && this.readyState == OPEN) {
+	if(data && this.readyState === OPEN) {
 		var frame = this._create_frame(0x01, data);
-		var bytesWritten = this.socket.write(frame);
+		var bytesWritten = this._socket.write(frame);
 		return bytesWritten > 0;
 	}
 	else {
@@ -979,15 +1010,17 @@ WebSocket.prototype.send = function(data) {
 	}
 };
 
-WebSocket.prototype._socketClose = function() {
-	if(this._closingTimer) clearTimeout(this._closingTimer);
+WebSocket.prototype._socket_close = function() {
+	if(this._closingTimer) {
+		clearTimeout(this._closingTimer);
+	}
 	this._closingTimer = undefined;
 	
-	if(this.readyState == CLOSING) {
+	var ev;
+	if(this.readyState === CLOSING) {
 		this.readyState = CLOSED;
-		this.socket.close();
-		
-		var ev = {
+		this._socket.close();
+		ev = {
 			code: 1000,
 			wasClean: true,
 			reason: ""
@@ -995,73 +1028,105 @@ WebSocket.prototype._socketClose = function() {
 		this.emit("close", ev);
 		this.onclose(ev);
 	}
-	else if(this.readyState != CLOSED) {
-		this.socket.close();
+	else if(this.readyState !== CLOSED) {
+		this._socket.close();
 		this.readyState = CLOSED;
-		var ev = {
+		ev = {
 			advice: "reconnect"
 		};
 		this.emit("error", ev);
 		this.onerror(ev);
 	}
-	this.socket = undefined;
-}
+	this._socket = undefined;
+};
 
-WebSocket.prototype._readCallback = function(e) {
-	if (e.bytesProcessed == -1) { // EOF
-		this._socketClose();
-		return;
-	}
 
-	var frame = parse_frame(e.buffer, e.bytesProcessed);
-	e.buffer.clear();
-	// TODO: check frame
-	
-	switch(frame.opcode) {
-	case 0x00: // continuation frame
-	case 0x01: // text frame
-	case 0x02: // binary frame
-		if(frame.fin) {
-			this.emit("message", {data: this._readBuffer + frame.payload});
-			this.onmessage({data: this._readBuffer + frame.payload});
-			this._readBuffer = '';
-		}
-		else {
-			this._readBuffer += frame.payload;
-		}
-		break;
-		
-	case 0x08: // connection close
-		if(this.readyState == CLOSING) {
-			this._socketClose();
-		}
-		else {
-			this.readyState = CLOSING;
-			this.socket.write(this._create_frame(0x08));
-			var self = this;
-			this._closingTimer = setTimeout(function() {
-				self._socketClose();
-			}, CLOSING_TIMEOUT);
-		}
-		break;
-		
-	case 0x09: // ping
-		this.socket.write(this._create_frame(0x0a, frame.payload));
-		break;
-	
-	case 0x0a: // pong
-		this._pong_received = true;
-		break;
-	}
-	
+WebSocket.prototype._read_callback = function(e) {
 	var self = this;
-	Ti.Stream.read(this.socket, e.buffer, function(e) { self._readCallback(e); });
+
+	if("undefined" === typeof e) {
+		e = {
+			bytesProcessed: 0,
+			buffer: Ti.createBuffer({ length: BUFFER_SIZE })
+		};
+	}
+	
+	if (e.bytesProcessed === -1) { // EOF
+		this._socket_close();
+		return undefined;
+	}
+
+	if('undefined' === typeof this.buffer) {
+		this.buffer = e.buffer;
+		this.bufferSize = e.bytesProcessed;
+	}
+	else {
+		this.buffer.copy(e.buffer, this.bufferSize, 0, e.bytesProcessed);
+		this.bufferSize += e.bytesProcessed;
+		e.buffer.clear();
+	}
+
+	var frame = parse_frame(this.buffer, this.bufferSize);
+	if('undefined' === typeof frame) {
+		Ti.Stream.read(this._socket, e.buffer, function(e) { self._read_callback(e); });
+	}
+	else {
+		if(frame.size < this.bufferSizes) {
+			var nextBuffer = Ti.createBuffer({ length: BUFFER_SIZE });
+			nextBuffer.copy(this.buffer, 0, frame.size, this.bufferSize - frame.size);
+			this.buffer.clear();
+			this.buffer = nextBuffer;
+			this.bufferSize -= frame.size;
+		}
+		else {
+			this.buffer.clear();
+			this.bufferSize = 0;
+		}
+		
+		switch(frame.opcode) {
+		case 0x00: // continuation frame
+		case 0x01: // text frame
+		case 0x02: // binary frame
+			if(frame.fin) {
+				this.emit("message", {data: this._readBuffer + frame.payload});
+				this.onmessage({data: this._readBuffer + frame.payload});
+				this._readBuffer = '';
+			}
+			else {
+				this._readBuffer += frame.payload;
+			}
+			break;
+			
+		case 0x08: // connection close
+			if(this.readyState === CLOSING) {
+				this._socket_close();
+			}
+			else {
+				this.readyState = CLOSING;
+				this._socket.write(this._create_frame(0x08));
+				this._closingTimer = setTimeout(function() {
+					self._socket_close();
+				}, CLOSING_TIMEOUT);
+			}
+			break;
+			
+		case 0x09: // ping
+			this._socket.write(this._create_frame(0x0a, frame.payload));
+			break;
+		
+		case 0x0a: // pong
+			this._pong_received = true;
+			break;
+		}
+		
+		this._read_callback();
+	}
 };
 
 WebSocket.prototype._error = function(e) {
 	this.readyState = CLOSED;
-	if(this.socket) {
-		this.socket.close();
+	if(this._socket) {
+		this._socket.close();
 	}
 	var ev = {
 		wasClean: true,
@@ -1072,10 +1137,10 @@ WebSocket.prototype._error = function(e) {
 	this.onerror(e);
 };
 
-WebSocket.prototype._raiseProtocolError = function(reason) {
+WebSocket.prototype._raise_protocol_error = function(reason) {
 	this.readyState = CLOSED;
-	if(this.socket) {
-		this.socket.close();
+	if(this._socket) {
+		this._socket.close();
 	}
 	var ev = {
 		wasClean: true,
@@ -1087,7 +1152,7 @@ WebSocket.prototype._raiseProtocolError = function(reason) {
 };
 
 WebSocket.prototype.close = function(code, message) {
-	if(this.readyState == OPEN) {
+	if(this.readyState === OPEN) {
 		this.readyState = CLOSING;
 		
 		var buffer = Ti.createBuffer({ length: BUFFER_SIZE });
@@ -1097,6 +1162,7 @@ WebSocket.prototype.close = function(code, message) {
 			dest: buffer,
 			position: 0,
 			type: Ti.Codec.TYPE_SHORT,
+			byteOrder: Ti.Codec.BIG_ENDIAN
 		});
 		
 		if(message) {
@@ -1115,20 +1181,22 @@ WebSocket.prototype.close = function(code, message) {
 			source: buffer,
 			charset: Ti.Codec.CHARSET_ASCII
 		});
-		this.socket.write(this._create_frame(0x08, payload));
+		this._socket.write(this._create_frame(0x08, payload));
 		
 		var self = this;
 		this._closingTimer = setTimeout(function() {
-			self._socketClose();
+			self._socket_close();
 		}, CLOSING_TIMEOUT);
 	}
 };
 
 WebSocket.prototype._connect = function() {
-	if(this.readyState == OPEN || this.readyState == CLOSING) return false;
-	
+	if(this.readyState === OPEN || this.readyState === CLOSING) {
+		return false;
+	}
+
 	var self = this;
-	var socket = this.socket = Ti.Network.Socket.createTCP({
+	this._socket = Ti.Network.Socket.createTCP({
 		host: this._host,
 		port: this._port,
 		mode: Ti.Network.READ_WRITE_MODE,
@@ -1136,32 +1204,32 @@ WebSocket.prototype._connect = function() {
 			var result;
 			result = self._send_handshake();
 			if(!result) {
-				return self._raiseProtocolError("send handshake");
+				return self._raise_protocol_error("send handshake");
 			}
 			
 			result = self._read_http_headers();
 			if(!result) {
-				return self._raiseProtocolError("parse http header");
+				return self._raise_protocol_error("parse http header");
 			}
 			
 			result = self._check_handshake_response();
 			if(!result) {
-				return self._raiseProtocolError("wrong handshake");
+				return self._raise_protocol_error("wrong handshake");
 			}
 			
 			self.readyState = OPEN;
 			self.emit("open");
 			self.onopen();
 			
-			Ti.Stream.read(socket, Ti.createBuffer({length: BUFFER_SIZE}), function(e){ self._readCallback(e); });
+			self._read_callback();
 		},
 		closed: function() {
-			self._socketClose();
+			self._socket_close();
 		},
 		error: function(e) {
 			self._error(e);
 		}
 	});
-	socket.connect();
+	this._socket.connect();
 };
 
