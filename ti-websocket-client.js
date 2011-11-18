@@ -1059,14 +1059,24 @@ WebSocket.prototype._readCallback = function(e) {
 };
 
 WebSocket.prototype._error = function(e) {
-	this.emit("error", e);
+	this.readyState = CLOSED;
+	if(this.socket) {
+		this.socket.close();
+	}
+	var ev = {
+		wasClean: true,
+		code: 1000, // ToDo: confirm error code
+		reason: reason
+	};
+	this.emit("error", ev);
 	this.onerror(e);
 };
 
 WebSocket.prototype._raiseProtocolError = function(reason) {
 	this.readyState = CLOSED;
-	this.socket.close();
-	
+	if(this.socket) {
+		this.socket.close();
+	}
 	var ev = {
 		wasClean: true,
 		code: 1002,
