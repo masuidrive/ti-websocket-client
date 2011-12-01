@@ -35,10 +35,10 @@ ws.onerror = function (e) {
 };
 ```
 
-## Working
+## Progress
 
-* Working for Socket.IO. I'll make for Socket.IO soon.
-* Supported iOS only, I'm waiting a patch from you.
+* Working good with node and ruby's websocket servers
+* You can run on Android and iPhone.
 
 
 ## License
