@@ -1053,30 +1053,27 @@ WebSocket.prototype._read_callback = function(e) {
 		Ti.Stream.read(self._socket, self._socketReadBuffer, function(e) { self._read_callback(e); });
 	};
 
-	if ("undefined" === typeof e || e.bytesProcessed === 0) {
-		return nextTick();
-	}
+	if('undefined' !== typeof e) {
+		if (0 === e.bytesProcessed) {
+			return nextTick();
+		}
 
-	var nextTick = function() {
-		self._socketReadBuffer.clear();
-		Ti.Stream.read(self._socket, self._socketReadBuffer, function(e) { self._read_callback(e); });
-	};
+		if(-1 === e.bytesProcessed) { // EOF
+			this._socket_close();
+			return undefined;
+		}
 
-	if (e.bytesProcessed === -1) { // EOF
-		this._socket_close();
-		return undefined;
+		if('undefined' === typeof this.buffer) {
+			this.buffer = this._socketReadBuffer.clone();
+			this.bufferSize = e.bytesProcessed;
+		}
+		else {
+			this.buffer.copy(this._socketReadBuffer, this.bufferSize, 0, e.bytesProcessed);
+			this.bufferSize += e.bytesProcessed;
+			this._socketReadBuffer.clear();
+		}
 	}
-
-	if('undefined' === typeof this.buffer) {
-		this.buffer = this._socketReadBuffer.clone();
-		this.bufferSize = e.bytesProcessed;
-	}
-	else {
-		this.buffer.copy(this._socketReadBuffer, this.bufferSize, 0, e.bytesProcessed);
-		this.bufferSize += e.bytesProcessed;
-		this._socketReadBuffer.clear();
-	}
-
+	
 	var frame = parse_frame(this.buffer, this.bufferSize);
 	if('undefined' === typeof frame) {
 		return nextTick();
@@ -1135,7 +1132,6 @@ WebSocket.prototype._read_callback = function(e) {
 		this._read_callback();
 	}
 };
-
 WebSocket.prototype._error = function(code, reason) {
   if(this.buffer) {
     this.buffer.clear();
