@@ -871,7 +871,8 @@ WebSocket.prototype._create_frame = function(opcode, d, last_frame) {
 			position: outIndex++,
 			type: Ti.Codec.TYPE_BYTE
 		});
-	}
+  }
+  /*
 	else if(length < BUFFER_SIZE) { // # write 2 byte length
 		Ti.Codec.encodeNumber({
 			source: (126 | 0x80),
@@ -887,7 +888,8 @@ WebSocket.prototype._create_frame = function(opcode, d, last_frame) {
 			byteOrder: Ti.Codec.BIG_ENDIAN
 		});
 		outIndex += 2;
-	}
+  }
+  */
 	else { //	# write 8 byte length
 		Ti.Codec.encodeNumber({
 			source: (127 | 0x80),
